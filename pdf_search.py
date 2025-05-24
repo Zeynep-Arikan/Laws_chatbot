@@ -1,3 +1,5 @@
+import os
+from glob import glob
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -5,24 +7,38 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms import HuggingFaceHub
 from langchain.chains import ConversationalRetrievalChain
 
-def pdf_chat(pdf_path):
-    loader = PyPDFLoader(pdf_path)
-    documents = loader.load()
+def pdf_chat_from_folder(folder_path):
+    # Tüm PDF dosyalarının yollarını al
+    pdf_files = glob(os.path.join(folder_path, "*.pdf"))
+    
+    # PDF'leri yükle
+    documents = []
+    for pdf_file in pdf_files:
+        loader = PyPDFLoader(pdf_file)
+        documents.extend(loader.load())
+
+    # Metni böl
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs = splitter.split_documents(documents)
+
+    # Vektör veritabanı oluştur
     embeddings = HuggingFaceEmbeddings()
     vectorstore = FAISS.from_documents(docs, embeddings)
 
+    # LLM yükle
     llm = HuggingFaceHub(
         repo_id="mistralai/Mistral-7B-Instruct-v0.2",
         model_kwargs={"temperature": 0.5, "max_new_tokens": 512}
     )
 
+    # Konuşma zinciri kur
     chain = ConversationalRetrievalChain.from_llm(
         llm,
         retriever=vectorstore.as_retriever()
     )
-    print("PDF Arama Modu: Kadın haklarıyla ilgili sorularınızı sorabilirsiniz.")
+
+    # Soru-cevap döngüsü
+    print("PDF Arama Modu: Kadın haklarıyla ilgili tüm PDF'lerde arama yapabilirsiniz.")
     chat_history = []
     while True:
         question = input("Soru: ")
